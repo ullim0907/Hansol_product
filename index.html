@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>한솔대전 생산관리</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body { font-family: 'Noto Sans KR', system-ui, sans-serif; background: #f6f7f8; color: #1c2024; }
+  button { font-family: inherit; cursor: pointer; }
+  input, select { font-family: inherit; }
+  table { border-collapse: collapse; }
+  .cell { border: 1px solid #d7dbe0; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
+  .hcell { border: 1px solid #c3c8d0; padding: 5px 8px; font-size: 11px; font-weight: 700; color: #3a3f47; background: #eef1f5; white-space: nowrap; cursor: pointer; user-select: none; }
+  .grpcell { border: 1px solid #c3c8d0; padding: 4px 8px; font-size: 11px; font-weight: 700; text-align: center; white-space: nowrap; }
+  .inp { border: 1px solid #d7dbe0; border-radius: 5px; padding: 5px 8px; font-size: 12px; font-family: inherit; width: 100%; background: #fff; }
+  .btn { border: none; border-radius: 7px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
+  .btn-accent { background: #1f6feb; color: #fff; }
+  .btn-outline { background: #fff; border: 1px solid #d7dbe0; color: #3a3f47; }
+  .tab { padding: 11px 14px; font-size: 13px; font-weight: 500; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
+  .tab.active { font-weight: 700; color: #1f6feb; border-bottom: 2px solid #1f6feb; }
+  .hidden { display: none !important; }
+  #loginScreen { height: 100%; display: flex; align-items: center; justify-content: center; }
+  #loginBox { background: #fff; border: 1px solid #e7e9ec; border-radius: 14px; padding: 32px; width: 340px; }
+  #app { display: none; flex-direction: column; height: 100vh; overflow: hidden; }
+  #tabbar { display: flex; align-items: center; gap: 2px; padding: 0 24px; background: #fff; border-bottom: 1px solid #e7e9ec; flex-shrink: 0; overflow-x: auto; }
+  #tablecontainer { flex: 1; overflow: auto; padding: 14px 24px; }
+  .badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: #1c2024; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; z-index: 999; }
+</style>
+</head>
+<body>
+
+<div id="loginScreen">
+  <div id="loginBox">
+    <div style="font-size:16px; font-weight:700; margin-bottom:4px;">한솔대전 생산관리</div>
+    <div style="font-size:12px; color:#8a8f98; margin-bottom:20px;">더울림코퍼레이션 · 담당자 로그인</div>
+    <label style="font-size:12px; color:#6b7280; font-weight:600;">담당자</label>
+    <select id="loginStaff" class="inp" style="margin:6px 0 12px;"></select>
+    <label style="font-size:12px; color:#6b7280; font-weight:600;">비밀번호(PIN)</label>
+    <input id="loginPin" class="inp" type="password" inputmode="numeric" style="margin:6px 0 16px;" placeholder="****">
+    <button id="loginBtn" class="btn btn-accent" style="width:100%; padding:10px;">로그인</button>
+    <div id="loginError" style="color:#c53030; font-size:12px; margin-top:10px;"></div>
+    <div style="font-size:11px; color:#b6bac1; margin-top:16px;">최초 비밀번호는 관리자에게 문의하세요.</div>
+  </div>
+</div>
+
+<div id="app">
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 24px; background:#ffffff; border-bottom:1px solid #e7e9ec; flex-shrink:0;">
+    <div style="display:flex; align-items:center; gap:12px;">
+      <div style="width:30px; height:30px; border-radius:7px; background:#1f6feb; display:flex; align-items:center; justify-content:center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+      </div>
+      <div>
+        <div style="font-size:15px; font-weight:700;">한솔대전 생산관리</div>
+        <div id="subtitle" style="font-size:11px; color:#8a8f98;">더울림코퍼레이션</div>
+      </div>
+    </div>
+    <div style="display:flex; align-items:center; gap:10px;">
+      <span id="whoami" style="font-size:12px; color:#3a3f47; font-weight:600;"></span>
+      <button id="logoutBtn" class="btn btn-outline">로그아웃</button>
+    </div>
+  </div>
+
+  <div id="allTopBar" style="display:flex; align-items:center; justify-content:space-between; padding:10px 24px; background:#fbfbfc; border-bottom:1px solid #eceef1; flex-shrink:0;">
+    <div id="staffStatusStrip" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;"></div>
+    <div style="display:flex; align-items:center; gap:8px;">
+      <input type="file" id="confirmFileInput" accept=".xlsx,.xls" multiple style="display:none;">
+      <button id="uploadConfirmBtn" class="btn btn-outline">확정파일 업로드 (다중)</button>
+      <button id="closeCycleBtn" class="btn btn-accent">🔒 이번 차수 마감</button>
+    </div>
+  </div>
+
+  <div id="tabbar"></div>
+
+  <div style="display:flex; align-items:center; gap:10px; padding:10px 24px; background:#fff; border-bottom:1px solid #eceef1; flex-shrink:0; flex-wrap:wrap;">
+    <input id="searchBox" class="inp" style="width:220px;" placeholder="지종 · 평량 · 규격(가로x세로) 검색">
+    <span style="font-size:11px; color:#8a8f98;">포장</span>
+    <select id="packFilter" class="inp" style="width:110px;">
+      <option value="">전체</option>
+      <option value="Roll">Roll</option>
+      <option value="Skid">Skid</option>
+      <option value="Ream">Ream</option>
+    </select>
+    <div style="flex:1;"></div>
+    <div id="rowCount" style="font-size:11px; color:#8a8f98;"></div>
+  </div>
+
+  <div id="newItemPanel" style="padding:12px 24px; background:#fbfbfc; border-bottom:1px solid #eceef1; flex-shrink:0; display:none;">
+    <div style="font-size:11px; font-weight:700; color:#8a8f98; margin-bottom:6px;">신규 품목 추가 (한 번에 최대 5개, 채운 줄만 추가됩니다)</div>
+    <div id="newItemRows"></div>
+    <button id="addItemsBtn" class="btn btn-accent" style="margin-top:8px;">+ 추가</button>
+  </div>
+
+  <div id="tablecontainer"></div>
+</div>
+
+<div id="addStaffModalBg" class="hidden" style="position:fixed; inset:0; background:rgba(0,0,0,.3); display:flex; align-items:center; justify-content:center; z-index:100;">
+  <div style="background:#fff; border-radius:12px; padding:24px; width:320px;">
+    <div style="font-size:14px; font-weight:700; margin-bottom:14px;">담당자 추가</div>
+    <input id="newStaffName" class="inp" placeholder="이름" style="margin-bottom:8px;">
+    <input id="newStaffPin" class="inp" placeholder="초기 비밀번호(숫자 4자리)" style="margin-bottom:14px;">
+    <div style="display:flex; gap:8px;">
+      <button id="cancelAddStaff" class="btn btn-outline" style="flex:1;">취소</button>
+      <button id="confirmAddStaff" class="btn btn-accent" style="flex:1;">추가</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import {
+  getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, onSnapshot,
+  query, orderBy, writeBatch
+} from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCUMmPdmIWf1cWeseCfVrx2kewauonSijI",
+  authDomain: "tucorp-93a17.firebaseapp.com",
+  projectId: "tucorp-93a17",
+  storageBucket: "tucorp-93a17.firebasestorage.app",
+  messagingSenderId: "732272963693",
+  appId: "1:732272963693:web:bae32168bfd9726de30f64",
+};
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+// ---------- state ----------
+let staffList = [];      // [{id,name,order,pin,active}]
+let cycles = [];         // [{id,label,status,deadline,overallStatus}]
+let items = [];          // [{id,gubun,customer,staff,jong,pyeong,garo,sero,pack,note,demand}]
+let entries = {};        // key `${itemId}_${cycleId}` -> {qtyTotal,weightTotal,qtySNT,...,confirmedQty,confirmedWeight,mismatch}
+let staffCycleStatus = {}; // key `${cycleId}_${staffId}` -> {status}
+let currentTab = "ALL";  // "ALL" or staff name
+let me = null;           // {id,name}
+let displayCycles = [];  // computed: last4 confirmed + open
+
+function cycleSortKey(label) {
+  // "26-10-3" -> [26,10,3]
+  return label.split("-").map(n => parseInt(n, 10));
+}
+function cmpCycle(a, b) {
+  const ka = cycleSortKey(a.label), kb = cycleSortKey(b.label);
+  for (let i = 0; i < 3; i++) { if (ka[i] !== kb[i]) return ka[i] - kb[i]; }
+  return 0;
+}
+
+function toast(msg) {
+  const t = document.createElement("div");
+  t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+// ---------- login ----------
+async function loadStaffForLogin() {
+  const snap = await getDocs(collection(db, "hd_staff"));
+  staffList = snap.docs.map(d => d.data()).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+  const sel = document.getElementById("loginStaff");
+  sel.innerHTML = staffList.filter(s => s.id !== "st_unassigned").map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+}
+
+document.getElementById("loginBtn").onclick = async () => {
+  const staffId = document.getElementById("loginStaff").value;
+  const pin = document.getElementById("loginPin").value.trim();
+  const errEl = document.getElementById("loginError");
+  errEl.textContent = "";
+  const staffDoc = staffList.find(s => s.id === staffId);
+  if (!staffDoc) { errEl.textContent = "담당자를 찾을 수 없습니다."; return; }
+  if (String(staffDoc.pin) !== pin) { errEl.textContent = "비밀번호가 올바르지 않습니다."; return; }
+  me = { id: staffDoc.id, name: staffDoc.name };
+  sessionStorage.setItem("hd_me", JSON.stringify(me));
+  startApp();
+};
+
+document.getElementById("logoutBtn").onclick = () => {
+  sessionStorage.removeItem("hd_me");
+  location.reload();
+};
+
+// ---------- realtime subscriptions ----------
+function subscribeAll() {
+  onSnapshot(collection(db, "hd_staff"), (snap) => {
+    staffList = snap.docs.map(d => d.data()).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
+    renderTabs();
+    renderStaffStatusStrip();
+  });
+  onSnapshot(collection(db, "hd_cycles"), (snap) => {
+    cycles = snap.docs.map(d => d.data()).sort(cmpCycle);
+    computeDisplayCycles();
+    render();
+  });
+  onSnapshot(collection(db, "hd_items"), (snap) => {
+    items = snap.docs.map(d => d.data());
+    render();
+  });
+  onSnapshot(collection(db, "hd_entries"), (snap) => {
+    entries = {};
+    snap.docs.forEach(d => { entries[d.id] = d.data(); });
+    render();
+  });
+  onSnapshot(collection(db, "hd_staffCycleStatus"), (snap) => {
+    staffCycleStatus = {};
+    snap.docs.forEach(d => { staffCycleStatus[d.id] = d.data(); });
+    renderStaffStatusStrip();
+  });
+}
+
+function computeDisplayCycles() {
+  const confirmed = cycles.filter(c => c.status === "confirmed").sort(cmpCycle);
+  const open = cycles.filter(c => c.status === "open").sort(cmpCycle);
+  const last4 = confirmed.slice(-4);
+  displayCycles = [...last4, ...open.slice(-1)];
+}
+
+function currentOpenCycle() {
+  const open = cycles.filter(c => c.status === "open").sort(cmpCycle);
+  return open[open.length - 1] || null;
+}
+
+// ---------- tabs ----------
+function renderTabs() {
+  const bar = document.getElementById("tabbar");
+  const staffTabs = staffList.filter(s => s.id !== "st_unassigned");
+  bar.innerHTML = "";
+  const allTab = document.createElement("div");
+  allTab.className = "tab" + (currentTab === "ALL" ? " active" : "");
+  allTab.textContent = "전체";
+  allTab.onclick = () => { currentTab = "ALL"; renderTabs(); render(); };
+  bar.appendChild(allTab);
+  staffTabs.forEach(s => {
+    const t = document.createElement("div");
+    t.className = "tab" + (currentTab === s.name ? " active" : "");
+    t.textContent = s.name;
+    t.onclick = () => { currentTab = s.name; renderTabs(); render(); };
+    bar.appendChild(t);
+  });
+  const addTab = document.createElement("div");
+  addTab.className = "tab";
+  addTab.style.color = "#9aa1ab";
+  addTab.style.fontWeight = "700";
+  addTab.textContent = "+ 담당자 추가";
+  addTab.onclick = () => { document.getElementById("addStaffModalBg").classList.remove("hidden"); };
+  bar.appendChild(addTab);
+}
+
+document.getElementById("cancelAddStaff").onclick = () => document.getElementById("addStaffModalBg").classList.add("hidden");
+document.getElementById("confirmAddStaff").onclick = async () => {
+  const name = document.getElementById("newStaffName").value.trim();
+  const pin = document.getElementById("newStaffPin").value.trim();
+  if (!name || !pin) { toast("이름과 비밀번호를 입력하세요"); return; }
+  const id = "st_" + Date.now();
+  const order = (staffList.reduce((m, s) => Math.max(m, s.order ?? 0), 0)) + 1;
+  await setDoc(doc(db, "hd_staff", id), { id, name, pin, order, active: true });
+  document.getElementById("addStaffModalBg").classList.add("hidden");
+  document.getElementById("newStaffName").value = "";
+  document.getElementById("newStaffPin").value = "";
+  toast(`"${name}" 담당자가 추가되었습니다`);
+};
+
+// ---------- staff closing status strip (전체 탭 상단) ----------
+function renderStaffStatusStrip() {
+  const strip = document.getElementById("staffStatusStrip");
+  const oc = currentOpenCycle();
+  if (!oc) { strip.innerHTML = ""; return; }
+  const label = `담당자 마감현황 (${oc.label} · 마감예정 ${oc.deadline || "-"})`;
+  const staffTabs = staffList.filter(s => s.id !== "st_unassigned");
+  strip.innerHTML = `<span style="font-size:11px; color:#8a8f98; font-weight:600; margin-right:4px;">${label}</span>` +
+    staffTabs.map(s => {
+      const st = staffCycleStatus[`${oc.id}_${s.id}`];
+      const status = st ? st.status : "마감전";
+      const dot = status === "마감완료" ? "#1a7f37" : status === "마감중" ? "#b45309" : "#9aa1ab";
+      const fg = status === "마감완료" ? "#1a7f37" : status === "마감중" ? "#b45309" : "#8a8f98";
+      return `<div style="display:flex; align-items:center; gap:5px; background:#fff; border:1px solid #e7e9ec; border-radius:999px; padding:3px 10px 3px 8px;">
+        <span style="width:7px; height:7px; border-radius:50%; background:${dot};"></span>
+        <span style="font-size:11px; font-weight:600; color:#3a3f47;">${s.name}</span>
+        <span style="font-size:10px; font-weight:700; color:${fg};">${status}</span>
+      </div>`;
+    }).join("");
+}
+
+// ---------- close cycle (전체 탭) ----------
+document.getElementById("closeCycleBtn").onclick = async () => {
+  const oc = currentOpenCycle();
+  if (!oc) { toast("진행 중인 차수가 없습니다"); return; }
+  if (!confirm(`${oc.label} 차수를 마감 처리하시겠습니까? 마감 후에는 해당 차수가 확정 처리되고, 다음 차수가 새로 열립니다.`)) return;
+  // mark current cycle confirmed
+  await updateDoc(doc(db, "hd_cycles", oc.id), { status: "confirmed", overallStatus: "마감완료" });
+  // create next cycle: increment last segment
+  const parts = oc.label.split("-").map(n => parseInt(n, 10));
+  parts[2] += 1;
+  const nextLabel = parts.join("-");
+  const prevDeadline = oc.deadline ? new Date(oc.deadline) : new Date();
+  const nextDeadline = new Date(prevDeadline.getTime() + 7 * 86400000);
+  await setDoc(doc(db, "hd_cycles", nextLabel), {
+    id: nextLabel, label: nextLabel, status: "open",
+    deadline: nextDeadline.toISOString().slice(0, 10), overallStatus: "마감전",
+  });
+  toast(`${oc.label} 마감 완료, ${nextLabel} 차수가 열렸습니다`);
+};
+
+// ---------- staff: 마감완료 처리 ----------
+async function staffCloseCurrentCycle() {
+  const oc = currentOpenCycle();
+  const staffDoc = staffList.find(s => s.name === currentTab);
+  if (!oc || !staffDoc) return;
+  const id = `${oc.id}_${staffDoc.id}`;
+  await setDoc(doc(db, "hd_staffCycleStatus", id), {
+    cycleId: oc.id, staffId: staffDoc.id, status: "마감완료", closedAt: new Date().toISOString(),
+  });
+  toast("마감 완료 처리되었습니다");
+}
+
+// ---------- weight calc ----------
+function calcWeight(item, qty) {
+  const g = Number(item.garo) || 0, i = Number(item.sero) || 0, p = Number(item.pyeong) || 0, q = Number(qty) || 0;
+  return Math.round((p * g * i * 500 / 1000000000 * q) * 100) / 100;
+}
+
+// ---------- entries write (qty input) ----------
+async function writeEntryQty(itemId, cycleId, qty, item) {
+  const id = `${itemId}_${cycleId}`;
+  const weight = calcWeight(item, qty);
+  await setDoc(doc(db, "hd_entries", id), {
+    id, itemId, cycleId, qtyTotal: Number(qty) || 0, weightTotal: weight,
+  }, { merge: true });
+}
+
+// ---------- new items (담당자 탭) ----------
+function renderNewItemRows() {
+  const wrap = document.getElementById("newItemRows");
+  wrap.innerHTML = "";
+  for (let i = 0; i < 5; i++) {
+    const row = document.createElement("div");
+    row.style.cssText = "display:grid; grid-template-columns: 90px 130px 110px 90px 70px 70px 110px 90px 1fr; gap:6px; margin-bottom:6px;";
+    row.innerHTML = `
+      <input class="inp ni-gubun" placeholder="구분">
+      <input class="inp ni-customer" placeholder="고객사">
+      <input class="inp ni-jong" placeholder="지종">
+      <input class="inp ni-pyeong" placeholder="평량" type="number">
+      <input class="inp ni-garo" placeholder="가로" type="number">
+      <input class="inp ni-sero" placeholder="세로" type="number">
+      <select class="inp ni-pack"><option value="">포장</option><option>Roll</option><option>Skid</option><option>Ream</option></select>
+      <input class="inp ni-demand" placeholder="수요" type="number">
+      <input class="inp ni-note" placeholder="비고">
+    `;
+    wrap.appendChild(row);
+  }
+}
+document.getElementById("addItemsBtn").onclick = async () => {
+  const rows = document.getElementById("newItemRows").children;
+  const staffDoc = staffList.find(s => s.name === currentTab);
+  let added = 0;
+  const batch = writeBatch(db);
+  for (const row of rows) {
+    const jong = row.querySelector(".ni-jong").value.trim();
+    const pyeong = row.querySelector(".ni-pyeong").value;
+    if (!jong || !pyeong) continue;
+    const id = "it_" + Date.now() + "_" + added;
+    batch.set(doc(db, "hd_items", id), {
+      id,
+      gubun: row.querySelector(".ni-gubun").value.trim(),
+      customer: row.querySelector(".ni-customer").value.trim(),
+      staff: staffDoc.name,
+      jong,
+      pyeong: Number(pyeong) || pyeong,
+      garo: Number(row.querySelector(".ni-garo").value) || null,
+      sero: Number(row.querySelector(".ni-sero").value) || null,
+      pack: row.querySelector(".ni-pack").value,
+      demand: row.querySelector(".ni-demand").value,
+      note: row.querySelector(".ni-note").value.trim(),
+    });
+    added++;
+  }
+  if (added === 0) { toast("입력된 품목이 없습니다"); return; }
+  await batch.commit();
+  renderNewItemRows();
+  toast(`${added}개 품목이 추가되었습니다`);
+};
+
+// ---------- confirm-file upload & matching ----------
+document.getElementById("uploadConfirmBtn").onclick = () => document.getElementById("confirmFileInput").click();
+document.getElementById("confirmFileInput").onchange = async (e) => {
+  const files = Array.from(e.target.files || []);
+  if (files.length === 0) return;
+  const oc = currentOpenCycle();
+  if (!oc) { toast("진행 중인 차수가 없습니다"); return; }
+  let totalMatched = 0, totalUnmatched = 0;
+  for (const file of files) {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { defval: "" });
+    for (const r of rows) {
+      const 반영여부 = String(r["반영여부"] ?? "").trim();
+      const 원발주처 = String(r["원발주처"] ?? "").trim();
+      if (!["승인", "반영"].includes(반영여부)) continue;
+      if (!원발주처.includes("더울림")) continue;
+      let jong = String(r["지종"] ?? "").trim().replace(/^Hi-Q\s*/i, "");
+      const pyeong = parseInt(r["평량"], 10);
+      const garo = parseInt(r["가로"], 10);
+      const sero = parseInt(r["세로"], 10) || 0;
+      const packRaw = String(r["포장"] ?? "").toUpperCase();
+      const qty = Number(r["수량"]) || 0;
+      const match = items.find(it => {
+        if (String(it.jong || "").trim() !== jong) return false;
+        if (parseInt(it.pyeong, 10) !== pyeong) return false;
+        if (parseInt(it.garo, 10) !== garo) return false;
+        if ((parseInt(it.sero, 10) || 0) !== sero) return false;
+        const itPack = String(it.pack || "").toUpperCase();
+        if (packRaw.includes("ROLL") && itPack !== "ROLL") return false;
+        if (packRaw.includes("SKID") && itPack !== "SKID") return false;
+        if (packRaw.includes("REAM") && itPack !== "REAM") return false;
+        return true;
+      });
+      if (!match) { totalUnmatched++; continue; }
+      const weight = calcWeight(match, qty);
+      const id = `${match.id}_${oc.id}`;
+      const existing = entries[id] || {};
+      const reqQty = existing.qtyTotal || 0;
+      const mismatch = Math.abs(weight - (existing.weightTotal || 0)) >= 3000;
+      await setDoc(doc(db, "hd_entries", id), {
+        id, itemId: match.id, cycleId: oc.id,
+        confirmedQty: qty, confirmedWeight: weight, mismatch,
+      }, { merge: true });
+      totalMatched++;
+    }
+  }
+  toast(`매칭 완료: ${totalMatched}건, 매칭 실패: ${totalUnmatched}건`);
+  e.target.value = "";
+};
+
+// ---------- render main table ----------
+function render() {
+  if (!me) return;
+  document.getElementById("subtitle").textContent = currentTab === "ALL" ? "전체 탭" : `${currentTab} 담당자 페이지`;
+  document.getElementById("allTopBar").style.display = currentTab === "ALL" ? "flex" : "none";
+  document.getElementById("newItemPanel").style.display = currentTab === "ALL" ? "none" : "block";
+  if (currentTab !== "ALL") renderNewItemRowsIfNeeded();
+
+  const container = document.getElementById("tablecontainer");
+  const search = document.getElementById("searchBox").value.trim().toLowerCase();
+  const packF = document.getElementById("packFilter").value;
+
+  let rows = items.filter(it => currentTab === "ALL" ? true : it.staff === currentTab);
+  if (packF) rows = rows.filter(it => it.pack === packF);
+  if (search) {
+    rows = rows.filter(it => {
+      const spec = `${it.garo}x${it.sero}`;
+      return (it.jong || "").toLowerCase().includes(search) ||
+        String(it.pyeong || "").includes(search) ||
+        spec.includes(search.replace(/\s/g, ""));
+    });
+  }
+  document.getElementById("rowCount").textContent = `전체 ${items.length}개 중 ${rows.length}개 표시`;
+
+  if (currentTab === "ALL") {
+    renderAllTable(container, rows);
+  } else {
+    renderStaffTable(container, rows);
+  }
+}
+
+function renderAllTable(container, rows) {
+  const head1 = displayCycles.map(c => {
+    const bg = c.status === "open" ? "#fff7e6" : "#eef1f5";
+    const dcolor = c.status === "open" ? "#b45309" : "#8a8f98";
+    const tag = c.status === "open" ? "(의뢐)" : "(확정)";
+    return `<th class="grpcell" colspan="2" style="background:${bg};">${c.label} ${tag}<br><span style="font-weight:400; font-size:9px; color:${dcolor};">마감${c.status==="open"?"예정":""} ${c.deadline||""}</span></th>`;
+  }).join("");
+  const head2 = displayCycles.map(c => {
+    const bg = c.status === "open" ? "background:#fff7e6;" : "";
+    return `<th class="hcell" style="${bg}">수량</th><th class="hcell" style="${bg}">중량</th>`;
+  }).join("");
+
+  const bodyRows = rows.map(it => {
+    const cells = displayCycles.map(c => {
+      const e = entries[`${it.id}_${c.id}`] || {};
+      const isOpen = c.status === "open";
+      const qty = isOpen ? (e.qtyTotal ?? "") : (e.confirmedQty ?? e.qtyTotal ?? "—");
+      const weight = isOpen ? (e.weightTotal ?? "") : (e.confirmedWeight ?? e.weightTotal ?? "—");
+      const mismatchBg = e.mismatch ? "background:#fdecea; font-weight:700;" : (isOpen ? "background:#fffdf5; font-weight:700;" : "");
+      return `<td class="cell" style="${mismatchBg}">${fmt(qty)}</td><td class="cell" style="color:#8a8f98;">${fmt(weight)}</td>`;
+    }).join("");
+    return `<tr>
+      <td class="cell">${it.gubun||""}</td>
+      <td class="cell">${it.customer||""}</td>
+      <td class="cell" style="font-weight:600;">${it.staff||""}</td>
+      <td class="cell" style="font-weight:600;">${it.jong||""}</td>
+      <td class="cell">${it.pyeong??""}</td>
+      <td class="cell">${it.garo??""}</td>
+      <td class="cell">${it.sero??""}</td>
+      <td class="cell">${it.pack||""}</td>
+      <td class="cell" style="color:#8a8f98;">${it.note||""}</td>
+      ${cells}
+    </tr>`;
+  }).join("");
+
+  container.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th class="hcell" rowspan="2">구분</th>
+          <th class="hcell" rowspan="2">고객사</th>
+          <th class="hcell" rowspan="2">담당자</th>
+          <th class="hcell" rowspan="2">지종</th>
+          <th class="hcell" rowspan="2">평량</th>
+          <th class="hcell" rowspan="2">가로</th>
+          <th class="hcell" rowspan="2">세로</th>
+          <th class="hcell" rowspan="2">포장</th>
+          <th class="hcell" rowspan="2">비고</th>
+          ${head1}
+        </tr>
+        <tr>${head2}</tr>
+      </thead>
+      <tbody>${bodyRows}</tbody>
+    </table>`;
+}
+
+function renderStaffTable(container, rows) {
+  const oc = currentOpenCycle();
+  const bodyRows = rows.map(it => {
+    const id = oc ? `${it.id}_${oc.id}` : null;
+    const e = id ? (entries[id] || {}) : {};
+    return `<tr>
+      <td class="cell">${it.gubun||""}</td>
+      <td class="cell">${it.customer||""}</td>
+      <td class="cell" style="font-weight:600;">${it.jong||""}</td>
+      <td class="cell">${it.pyeong??""}</td>
+      <td class="cell">${it.garo??""}</td>
+      <td class="cell">${it.sero??""}</td>
+      <td class="cell">${it.pack||""}</td>
+      <td class="cell" style="color:#8a8f98;">${it.note||""}</td>
+      <td class="cell">${it.demand??""}</td>
+      <td class="cell" style="background:#fffdf5; padding:3px 6px;">
+        <input class="inp qty-input" data-item="${it.id}" type="number" style="padding:3px 6px; text-align:right;" value="${e.qtyTotal ?? ""}">
+      </td>
+      <td class="cell" style="background:#fffdf5; color:#8a8f98; text-align:right;">${fmt(e.weightTotal)}</td>
+    </tr>`;
+  }).join("");
+
+  const oc_label = oc ? `${oc.label} · 마감예정 ${oc.deadline||"-"}` : "진행 중인 차수 없음";
+  container.innerHTML = `
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <span class="badge" style="background:#fdf2e9; color:#b45309;">이번 차수 ${oc_label}</span>
+      <button id="staffCloseBtn" class="btn btn-accent">🔒 마감완료 처리</button>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th class="hcell">구분</th><th class="hcell">고객사</th><th class="hcell">지종</th>
+          <th class="hcell">평량</th><th class="hcell">가로</th><th class="hcell">세로</th>
+          <th class="hcell">포장</th><th class="hcell">비고</th><th class="hcell">수요</th>
+          <th class="hcell" style="background:#fff7e6;">${oc?oc.label:''} 수량 입력</th>
+          <th class="hcell" style="background:#fff7e6;">중량(자동)</th>
+        </tr>
+      </thead>
+      <tbody>${bodyRows}</tbody>
+    </table>`;
+
+  document.getElementById("staffCloseBtn").onclick = staffCloseCurrentCycle;
+  container.querySelectorAll(".qty-input").forEach(inp => {
+    inp.addEventListener("change", async () => {
+      const itemId = inp.dataset.item;
+      const item = items.find(i => i.id === itemId);
+      if (!oc || !item) return;
+      await writeEntryQty(itemId, oc.id, inp.value, item);
+    });
+  });
+}
+
+let newItemRowsRendered = false;
+function renderNewItemRowsIfNeeded() {
+  if (!newItemRowsRendered) { renderNewItemRows(); newItemRowsRendered = true; }
+}
+
+function fmt(v) {
+  if (v === "" || v === undefined || v === null) return "";
+  if (v === "—") return "—";
+  const n = Number(v);
+  if (Number.isNaN(n)) return v;
+  return n.toLocaleString();
+}
+
+document.getElementById("searchBox").oninput = render;
+document.getElementById("packFilter").onchange = render;
+
+// ---------- boot ----------
+async function startApp() {
+  document.getElementById("loginScreen").style.display = "none";
+  document.getElementById("app").style.display = "flex";
+  document.getElementById("whoami").textContent = `${me.name}님`;
+  subscribeAll();
+}
+
+(async function boot() {
+  await loadStaffForLogin();
+  const saved = sessionStorage.getItem("hd_me");
+  if (saved) { me = JSON.parse(saved); startApp(); }
+})();
+</script>
+</body>
+</html>
