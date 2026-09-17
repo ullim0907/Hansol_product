@@ -19,7 +19,7 @@
   .num { text-align: right; }
   .frozen { position: sticky; left: 0; z-index: 2; }
   thead .frozen { z-index: 5; }
-  .relhdr { position: relative; }
+  .relhdr { /* positioning context for the resizer handle is already provided by .hcell's position:sticky */ }
   .resizer { position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; z-index: 6; }
   .resizer:hover { background: #1f6feb55; }
   .filterIcon { font-size: 9px; color: #6b7280; margin-left: 4px; cursor: pointer; user-select: none; }
@@ -38,7 +38,9 @@
   .navpill .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
   .navpill .navstatus { font-size: 10px; font-weight: 700; color: #8a8f98; }
   .navpill.addpill { color: #9aa1ab; font-weight: 700; border-style: dashed; }
-  #tablecontainer { flex: 1; overflow: auto; padding: 14px 24px; }
+  #tablecontainer { flex: 1; overflow: auto; padding: 0 24px 14px; }
+  #tablecontainer > div:first-child { padding-top: 14px; }
+  #tablecontainer table { margin-top: 14px; }
   .badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
   .toast { position: fixed; bottom: 20px; right: 20px; background: #1c2024; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; z-index: 999; }
   #filterPopup label { cursor: pointer; }
@@ -616,6 +618,13 @@ function buildTable(container, rows, opts) {
       </thead>
       <tbody>${bodyRows}</tbody>
     </table>`;
+
+  // second header row must stick BELOW the first header row, not on top of it
+  const theadRows = container.querySelectorAll("thead tr");
+  if (theadRows.length === 2) {
+    const row1Height = theadRows[0].getBoundingClientRect().height;
+    theadRows[1].querySelectorAll("th").forEach(th => { th.style.top = row1Height + "px"; });
+  }
 
   container.querySelectorAll(".filterIcon").forEach(icon => {
     icon.onclick = (e) => {
