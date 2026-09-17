@@ -12,27 +12,36 @@
   body { font-family: 'Noto Sans KR', system-ui, sans-serif; background: #f6f7f8; color: #1c2024; }
   button { font-family: inherit; cursor: pointer; }
   input, select { font-family: inherit; }
-  table { border-collapse: collapse; }
+  table { border-collapse: collapse; table-layout: fixed; }
   .cell { border: 1px solid #d7dbe0; padding: 4.75px 7.6px; font-size: 11px; font-weight: 400; white-space: nowrap; background: #fff; overflow: hidden; text-overflow: ellipsis; }
-  .hcell { border: 1px solid #c3c8d0; padding: 5px 8px; font-size: 11px; font-weight: 400; color: #3a3f47; background: #eef1f5; white-space: nowrap; cursor: pointer; user-select: none; }
-  .grpcell { border: 1px solid #c3c8d0; padding: 4px 8px; font-size: 11px; font-weight: 400; text-align: center; white-space: nowrap; }
+  .hcell { border: 1px solid #c3c8d0; padding: 5px 8px; font-size: 11px; font-weight: 400; color: #3a3f47; background: #eef1f5; white-space: nowrap; position: sticky; top: 0; z-index: 3; }
+  .grpcell { border: 1px solid #c3c8d0; padding: 4px 8px; font-size: 11px; font-weight: 400; text-align: center; white-space: nowrap; position: sticky; top: 0; z-index: 3; }
   .num { text-align: right; }
-  .frozen { position: sticky; z-index: 2; }
-  thead .frozen { z-index: 4; }
+  .frozen { position: sticky; left: 0; z-index: 2; }
+  thead .frozen { z-index: 5; }
+  .relhdr { position: relative; }
+  .resizer { position: absolute; right: 0; top: 0; width: 6px; height: 100%; cursor: col-resize; z-index: 6; }
+  .resizer:hover { background: #1f6feb55; }
+  .filterIcon { font-size: 9px; color: #6b7280; margin-left: 4px; cursor: pointer; user-select: none; }
+  .filterIcon:hover { color: #1f6feb; }
   .inp { border: 1px solid #d7dbe0; border-radius: 5px; padding: 5px 8px; font-size: 12px; font-family: inherit; width: 100%; background: #fff; }
   .btn { border: none; border-radius: 7px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
   .btn-accent { background: #1f6feb; color: #fff; }
   .btn-outline { background: #fff; border: 1px solid #d7dbe0; color: #3a3f47; }
-  .tab { padding: 11px 14px; font-size: 13px; font-weight: 500; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; }
-  .tab.active { font-weight: 700; color: #1f6feb; border-bottom: 2px solid #1f6feb; }
   .hidden { display: none !important; }
   #loginScreen { height: 100%; display: flex; align-items: center; justify-content: center; }
   #loginBox { background: #fff; border: 1px solid #e7e9ec; border-radius: 14px; padding: 32px; width: 340px; }
   #app { display: none; flex-direction: column; height: 100vh; overflow: hidden; }
-  #tabbar { display: flex; align-items: center; gap: 2px; padding: 0 24px; background: #fff; border-bottom: 1px solid #e7e9ec; flex-shrink: 0; overflow-x: auto; }
+  #navBar { display: flex; align-items: center; gap: 6px; padding: 10px 24px; background: #fbfbfc; border-bottom: 1px solid #eceef1; flex-shrink: 0; overflow-x: auto; }
+  .navpill { display: flex; align-items: center; gap: 5px; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; background: #fff; border: 1px solid #e7e9ec; color: #3a3f47; }
+  .navpill.active { border-color: #1f6feb; box-shadow: 0 0 0 1px #1f6feb inset; color: #1f6feb; }
+  .navpill .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+  .navpill .navstatus { font-size: 10px; font-weight: 700; color: #8a8f98; }
+  .navpill.addpill { color: #9aa1ab; font-weight: 700; border-style: dashed; }
   #tablecontainer { flex: 1; overflow: auto; padding: 14px 24px; }
   .badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
   .toast { position: fixed; bottom: 20px; right: 20px; background: #1c2024; color: #fff; padding: 10px 16px; border-radius: 8px; font-size: 13px; z-index: 999; }
+  #filterPopup label { cursor: pointer; }
 </style>
 </head>
 <body>
@@ -68,40 +77,43 @@
     </div>
   </div>
 
-  <div id="allTopBar" style="display:flex; align-items:center; justify-content:space-between; padding:10px 24px; background:#fbfbfc; border-bottom:1px solid #eceef1; flex-shrink:0;">
-    <div id="staffStatusStrip" style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;"></div>
-    <div style="display:flex; align-items:center; gap:8px;">
-      <input type="file" id="confirmFileInput" accept=".xlsx,.xls" multiple style="display:none;">
-      <button id="uploadConfirmBtn" class="btn btn-outline">확정파일 업로드 (다중)</button>
-      <button id="closeCycleBtn" class="btn btn-accent">🔒 이번 차수 마감</button>
-    </div>
+  <div id="navBar"></div>
+
+  <div id="allTopBar" style="display:flex; align-items:center; justify-content:flex-end; gap:8px; padding:10px 24px; background:#fbfbfc; border-bottom:1px solid #eceef1; flex-shrink:0;">
+    <input type="file" id="confirmFileInput" accept=".xlsx,.xls" multiple style="display:none;">
+    <button id="uploadConfirmBtn" class="btn btn-outline">확정파일 업로드 (다중)</button>
+    <button id="closeCycleBtn" class="btn btn-accent">🔒 이번 차수 마감</button>
   </div>
 
-  <div id="tabbar"></div>
-
   <div style="display:flex; align-items:center; gap:10px; padding:10px 24px; background:#fff; border-bottom:1px solid #eceef1; flex-shrink:0; flex-wrap:wrap;">
-    <input id="searchBox" class="inp" style="width:220px;" placeholder="지종 · 평량 · 규격(가로x세로) 검색">
-    <span style="font-size:11px; color:#8a8f98;">포장</span>
-    <select id="packFilter" class="inp" style="width:110px;">
-      <option value="">전체</option>
-      <option value="Roll">Roll</option>
-      <option value="Skid">Skid</option>
-      <option value="Ream">Ream</option>
-    </select>
-    <span id="startCycleWrap" style="display:none; align-items:center; gap:8px;">
+    <input id="searchBox" class="inp" style="width:260px;" placeholder="검색: 지종·평량·가로x세로·포장·고객사·구분·비고 등 (예: 더블랑)">
+    <label style="display:flex; align-items:center; gap:5px; font-size:11px; color:#6b7280;">
+      <input type="checkbox" id="hideWeightChk"> 중량 숨기기
+    </label>
+    <span id="startCycleWrap" style="display:flex; align-items:center; gap:8px;">
       <span style="font-size:11px; color:#8a8f98;">시작 차수</span>
-      <input id="startCycleInput" class="inp" style="width:120px;" placeholder="예: 26-8-3">
+      <input id="startCycleInput" class="inp" style="width:110px;" placeholder="예: 26-8-3">
       <button id="startCycleApply" class="btn btn-outline">검색</button>
-      <button id="startCycleReset" class="btn btn-outline">초기화(최근 5개)</button>
+      <button id="startCycleReset" class="btn btn-outline">최근 5개</button>
     </span>
     <div style="flex:1;"></div>
     <div id="rowCount" style="font-size:11px; color:#8a8f98;"></div>
   </div>
 
   <div id="newItemPanel" style="padding:12px 24px; background:#fbfbfc; border-bottom:1px solid #eceef1; flex-shrink:0; display:none;">
-    <div style="font-size:11px; font-weight:700; color:#8a8f98; margin-bottom:6px;">신규 품목 추가 (한 번에 최대 5개, 채운 줄만 추가됩니다)</div>
-    <div id="newItemRows"></div>
-    <button id="addItemsBtn" class="btn btn-accent" style="margin-top:8px;">+ 추가</button>
+    <div style="font-size:11px; font-weight:700; color:#8a8f98; margin-bottom:6px;">신규 품목 추가</div>
+    <div style="display:grid; grid-template-columns: 80px 120px 100px 70px 60px 60px 100px 1fr 70px 70px; gap:6px; align-items:center;">
+      <input id="ni-gubun" class="inp" placeholder="구분">
+      <input id="ni-customer" class="inp" placeholder="고객사">
+      <input id="ni-jong" class="inp" placeholder="지종">
+      <input id="ni-pyeong" class="inp" type="number" placeholder="평량">
+      <input id="ni-garo" class="inp" type="number" placeholder="가로">
+      <input id="ni-sero" class="inp" type="number" placeholder="세로">
+      <select id="ni-pack" class="inp"><option value="">포장</option><option>Roll</option><option>Skid</option><option>Ream</option></select>
+      <input id="ni-note" class="inp" placeholder="비고">
+      <input id="ni-demand" class="inp" type="number" placeholder="수요">
+      <button id="addItemBtn" class="btn btn-accent">등록</button>
+    </div>
   </div>
 
   <div id="tablecontainer"></div>
@@ -122,8 +134,7 @@
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
 import {
-  getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, onSnapshot,
-  query, orderBy, writeBatch
+  getFirestore, collection, doc, getDocs, setDoc, updateDoc, onSnapshot, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-firestore.js";
 
 const firebaseConfig = {
@@ -138,18 +149,21 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
 // ---------- state ----------
-let staffList = [];      // [{id,name,order,pin,active}]
-let cycles = [];         // [{id,label,status,deadline,overallStatus}]
-let items = [];          // [{id,gubun,customer,staff,jong,pyeong,garo,sero,pack,note,demand}]
-let entries = {};        // key `${itemId}_${cycleId}` -> {qtyTotal,weightTotal,qtySNT,...,confirmedQty,confirmedWeight,mismatch}
-let staffCycleStatus = {}; // key `${cycleId}_${staffId}` -> {status}
-let currentTab = "ALL";  // "ALL" or staff name
-let me = null;           // {id,name}
-let displayCycles = [];  // computed: last5 confirmed (or from startCycleOverride) + open
-let startCycleOverride = null; // e.g. "26-8-3" -> show from this confirmed cycle onward
+let staffList = [];
+let cycles = [];
+let items = [];
+let entries = {};
+let staffCycleStatus = {};
+let currentTab = "ALL";
+let me = null;
+let displayCycles = [];
+let startCycleOverride = null;
+let hideWeight = false;
+let columnFilters = {};   // key -> Set(allowed values) ; absent = all
+let colWidths = {};       // key -> px width (user-resized)
+let activeFilterKey = null;
 
-// frozen (틀고정) column definitions
-const FROZEN_ALL = [
+const FROZEN_COLS = [
   { key: "gubun", label: "구분", w: 60 },
   { key: "customer", label: "고객사", w: 110 },
   { key: "staff", label: "담당자", w: 65 },
@@ -160,25 +174,14 @@ const FROZEN_ALL = [
   { key: "pack", label: "포장", w: 65 },
   { key: "note", label: "비고", w: 110 },
 ];
-const FROZEN_STAFF = [
-  { key: "gubun", label: "구분", w: 60 },
-  { key: "customer", label: "고객사", w: 110 },
-  { key: "jong", label: "지종", w: 75 },
-  { key: "pyeong", label: "평량", w: 55 },
-  { key: "garo", label: "가로", w: 55 },
-  { key: "sero", label: "세로", w: 55 },
-  { key: "pack", label: "포장", w: 65 },
-  { key: "note", label: "비고", w: 110 },
-];
+const FILTERABLE_KEYS = ["gubun", "customer", "staff", "jong", "pyeong", "garo", "sero", "pack"];
+
 function withLefts(cols) {
   let left = 0;
-  return cols.map(c => { const withLeft = { ...c, left }; left += c.w; return withLeft; });
+  return cols.map(c => { const w = colWidths[c.key] ?? c.w; const withLeft = { ...c, w, left }; left += w; return withLeft; });
 }
 
-function cycleSortKey(label) {
-  // "26-10-3" -> [26,10,3]
-  return label.split("-").map(n => parseInt(n, 10));
-}
+function cycleSortKey(label) { return label.split("-").map(n => parseInt(n, 10)); }
 function cmpCycle(a, b) {
   const ka = cycleSortKey(a.label), kb = cycleSortKey(b.label);
   for (let i = 0; i < 3; i++) { if (ka[i] !== kb[i]) return ka[i] - kb[i]; }
@@ -222,12 +225,12 @@ document.getElementById("logoutBtn").onclick = () => {
 function subscribeAll() {
   onSnapshot(collection(db, "hd_staff"), (snap) => {
     staffList = snap.docs.map(d => d.data()).sort((a, b) => (a.order ?? 99) - (b.order ?? 99));
-    renderTabs();
-    renderStaffStatusStrip();
+    renderNavBar();
   });
   onSnapshot(collection(db, "hd_cycles"), (snap) => {
     cycles = snap.docs.map(d => d.data()).sort(cmpCycle);
     computeDisplayCycles();
+    renderNavBar();
     render();
   });
   onSnapshot(collection(db, "hd_items"), (snap) => {
@@ -242,7 +245,7 @@ function subscribeAll() {
   onSnapshot(collection(db, "hd_staffCycleStatus"), (snap) => {
     staffCycleStatus = {};
     snap.docs.forEach(d => { staffCycleStatus[d.id] = d.data(); });
-    renderStaffStatusStrip();
+    renderNavBar();
   });
 }
 
@@ -251,7 +254,6 @@ function computeDisplayCycles() {
   const open = cycles.filter(c => c.status === "open").sort(cmpCycle);
   let selected;
   if (startCycleOverride) {
-    const startKey = cycleSortKey(startCycleOverride);
     selected = confirmed.filter(c => cmpCycle({ label: c.label }, { label: startCycleOverride }) >= 0);
     if (selected.length === 0) selected = confirmed.slice(-5);
   } else {
@@ -265,30 +267,29 @@ function currentOpenCycle() {
   return open[open.length - 1] || null;
 }
 
-// ---------- tabs ----------
-function renderTabs() {
-  const bar = document.getElementById("tabbar");
+// ---------- unified nav bar (tabs + 담당자 마감현황, one row) ----------
+function renderNavBar() {
+  const bar = document.getElementById("navBar");
+  const oc = currentOpenCycle();
   const staffTabs = staffList.filter(s => s.id !== "st_unassigned");
-  bar.innerHTML = "";
-  const allTab = document.createElement("div");
-  allTab.className = "tab" + (currentTab === "ALL" ? " active" : "");
-  allTab.textContent = "전체";
-  allTab.onclick = () => { currentTab = "ALL"; renderTabs(); render(); };
-  bar.appendChild(allTab);
-  staffTabs.forEach(s => {
-    const t = document.createElement("div");
-    t.className = "tab" + (currentTab === s.name ? " active" : "");
-    t.textContent = s.name;
-    t.onclick = () => { currentTab = s.name; renderTabs(); render(); };
-    bar.appendChild(t);
+  const allActive = currentTab === "ALL";
+  let html = `<div class="navpill ${allActive ? "active" : ""}" data-tab="ALL">전체</div>`;
+  html += staffTabs.map(s => {
+    const active = currentTab === s.name;
+    const st = oc ? staffCycleStatus[`${oc.id}_${s.id}`] : null;
+    const status = st ? st.status : "마감전";
+    const dot = status === "마감완료" ? "#1a7f37" : status === "마감중" ? "#b45309" : "#9aa1ab";
+    return `<div class="navpill ${active ? "active" : ""}" data-tab="${s.name}">
+      <span class="dot" style="background:${dot};"></span>${s.name}<span class="navstatus">${status}</span>
+    </div>`;
+  }).join("");
+  html += `<div class="navpill addpill" id="addStaffPill">+ 담당자 추가</div>`;
+  bar.innerHTML = html;
+  bar.querySelectorAll(".navpill[data-tab]").forEach(el => {
+    el.onclick = () => { currentTab = el.dataset.tab; renderNavBar(); render(); };
   });
-  const addTab = document.createElement("div");
-  addTab.className = "tab";
-  addTab.style.color = "#9aa1ab";
-  addTab.style.fontWeight = "700";
-  addTab.textContent = "+ 담당자 추가";
-  addTab.onclick = () => { document.getElementById("addStaffModalBg").classList.remove("hidden"); };
-  bar.appendChild(addTab);
+  const addPill = document.getElementById("addStaffPill");
+  if (addPill) addPill.onclick = () => document.getElementById("addStaffModalBg").classList.remove("hidden");
 }
 
 document.getElementById("cancelAddStaff").onclick = () => document.getElementById("addStaffModalBg").classList.add("hidden");
@@ -305,35 +306,12 @@ document.getElementById("confirmAddStaff").onclick = async () => {
   toast(`"${name}" 담당자가 추가되었습니다`);
 };
 
-// ---------- staff closing status strip (전체 탭 상단) ----------
-function renderStaffStatusStrip() {
-  const strip = document.getElementById("staffStatusStrip");
-  const oc = currentOpenCycle();
-  if (!oc) { strip.innerHTML = ""; return; }
-  const label = `담당자 마감현황 (${oc.label} · 마감예정 ${oc.deadline || "-"})`;
-  const staffTabs = staffList.filter(s => s.id !== "st_unassigned");
-  strip.innerHTML = `<span style="font-size:11px; color:#8a8f98; font-weight:600; margin-right:4px;">${label}</span>` +
-    staffTabs.map(s => {
-      const st = staffCycleStatus[`${oc.id}_${s.id}`];
-      const status = st ? st.status : "마감전";
-      const dot = status === "마감완료" ? "#1a7f37" : status === "마감중" ? "#b45309" : "#9aa1ab";
-      const fg = status === "마감완료" ? "#1a7f37" : status === "마감중" ? "#b45309" : "#8a8f98";
-      return `<div style="display:flex; align-items:center; gap:5px; background:#fff; border:1px solid #e7e9ec; border-radius:999px; padding:3px 10px 3px 8px;">
-        <span style="width:7px; height:7px; border-radius:50%; background:${dot};"></span>
-        <span style="font-size:11px; font-weight:600; color:#3a3f47;">${s.name}</span>
-        <span style="font-size:10px; font-weight:700; color:${fg};">${status}</span>
-      </div>`;
-    }).join("");
-}
-
 // ---------- close cycle (전체 탭) ----------
 document.getElementById("closeCycleBtn").onclick = async () => {
   const oc = currentOpenCycle();
   if (!oc) { toast("진행 중인 차수가 없습니다"); return; }
   if (!confirm(`${oc.label} 차수를 마감 처리하시겠습니까? 마감 후에는 해당 차수가 확정 처리되고, 다음 차수가 새로 열립니다.`)) return;
-  // mark current cycle confirmed
   await updateDoc(doc(db, "hd_cycles", oc.id), { status: "confirmed", overallStatus: "마감완료" });
-  // create next cycle: increment last segment
   const parts = oc.label.split("-").map(n => parseInt(n, 10));
   parts[2] += 1;
   const nextLabel = parts.join("-");
@@ -364,7 +342,6 @@ function calcWeight(item, qty) {
   return Math.round(p * g * i * 500 / 1000000000 * q);
 }
 
-// ---------- entries write (qty input) ----------
 async function writeEntryQty(itemId, cycleId, qty, item) {
   const id = `${itemId}_${cycleId}`;
   const weight = calcWeight(item, qty);
@@ -373,56 +350,31 @@ async function writeEntryQty(itemId, cycleId, qty, item) {
   }, { merge: true });
 }
 
-// ---------- new items (담당자 탭) ----------
-function renderNewItemRows() {
-  const wrap = document.getElementById("newItemRows");
-  wrap.innerHTML = "";
-  for (let i = 0; i < 5; i++) {
-    const row = document.createElement("div");
-    row.style.cssText = "display:grid; grid-template-columns: 90px 130px 110px 90px 70px 70px 110px 90px 1fr; gap:6px; margin-bottom:6px;";
-    row.innerHTML = `
-      <input class="inp ni-gubun" placeholder="구분">
-      <input class="inp ni-customer" placeholder="고객사">
-      <input class="inp ni-jong" placeholder="지종">
-      <input class="inp ni-pyeong" placeholder="평량" type="number">
-      <input class="inp ni-garo" placeholder="가로" type="number">
-      <input class="inp ni-sero" placeholder="세로" type="number">
-      <select class="inp ni-pack"><option value="">포장</option><option>Roll</option><option>Skid</option><option>Ream</option></select>
-      <input class="inp ni-demand" placeholder="수요" type="number">
-      <input class="inp ni-note" placeholder="비고">
-    `;
-    wrap.appendChild(row);
-  }
-}
-document.getElementById("addItemsBtn").onclick = async () => {
-  const rows = document.getElementById("newItemRows").children;
+// ---------- new item (single row, 담당자 탭) ----------
+document.getElementById("addItemBtn").onclick = async () => {
   const staffDoc = staffList.find(s => s.name === currentTab);
-  let added = 0;
-  const batch = writeBatch(db);
-  for (const row of rows) {
-    const jong = row.querySelector(".ni-jong").value.trim();
-    const pyeong = row.querySelector(".ni-pyeong").value;
-    if (!jong || !pyeong) continue;
-    const id = "it_" + Date.now() + "_" + added;
-    batch.set(doc(db, "hd_items", id), {
-      id,
-      gubun: row.querySelector(".ni-gubun").value.trim(),
-      customer: row.querySelector(".ni-customer").value.trim(),
-      staff: staffDoc.name,
-      jong,
-      pyeong: Number(pyeong) || pyeong,
-      garo: Number(row.querySelector(".ni-garo").value) || null,
-      sero: Number(row.querySelector(".ni-sero").value) || null,
-      pack: row.querySelector(".ni-pack").value,
-      demand: row.querySelector(".ni-demand").value,
-      note: row.querySelector(".ni-note").value.trim(),
-    });
-    added++;
-  }
-  if (added === 0) { toast("입력된 품목이 없습니다"); return; }
-  await batch.commit();
-  renderNewItemRows();
-  toast(`${added}개 품목이 추가되었습니다`);
+  if (!staffDoc) return;
+  const jong = document.getElementById("ni-jong").value.trim();
+  const pyeong = document.getElementById("ni-pyeong").value;
+  if (!jong || !pyeong) { toast("지종과 평량은 필수입니다"); return; }
+  const id = "it_" + Date.now();
+  await setDoc(doc(db, "hd_items", id), {
+    id,
+    gubun: document.getElementById("ni-gubun").value.trim(),
+    customer: document.getElementById("ni-customer").value.trim(),
+    staff: staffDoc.name,
+    jong,
+    pyeong: Number(pyeong) || pyeong,
+    garo: Number(document.getElementById("ni-garo").value) || null,
+    sero: Number(document.getElementById("ni-sero").value) || null,
+    pack: document.getElementById("ni-pack").value,
+    note: document.getElementById("ni-note").value.trim(),
+    demand: document.getElementById("ni-demand").value,
+  });
+  ["ni-gubun","ni-customer","ni-jong","ni-pyeong","ni-garo","ni-sero","ni-pack","ni-note","ni-demand"].forEach(elId => {
+    document.getElementById(elId).value = "";
+  });
+  toast("품목이 추가되었습니다");
 };
 
 // ---------- confirm-file upload & matching ----------
@@ -464,7 +416,6 @@ document.getElementById("confirmFileInput").onchange = async (e) => {
       const weight = calcWeight(match, qty);
       const id = `${match.id}_${oc.id}`;
       const existing = entries[id] || {};
-      const reqQty = existing.qtyTotal || 0;
       const mismatch = Math.abs(weight - (existing.weightTotal || 0)) >= 3000;
       await setDoc(doc(db, "hd_entries", id), {
         id, itemId: match.id, cycleId: oc.id,
@@ -477,74 +428,187 @@ document.getElementById("confirmFileInput").onchange = async (e) => {
   e.target.value = "";
 };
 
-// ---------- render main table ----------
+// ---------- column filter popup ----------
+function closeFilterPopup() {
+  const p = document.getElementById("filterPopup");
+  if (p) p.remove();
+}
+document.addEventListener("click", (e) => {
+  const p = document.getElementById("filterPopup");
+  if (p && !p.contains(e.target) && !e.target.classList.contains("filterIcon")) {
+    closeFilterPopup();
+    activeFilterKey = null;
+  }
+});
+function openFilterPopup(key, label, anchorEl) {
+  closeFilterPopup();
+  activeFilterKey = key;
+  const uniq = Array.from(new Set(items.map(it => String(it[key] ?? "")))).filter(v => v !== "").sort();
+  const selected = columnFilters[key];
+  const rect = anchorEl.getBoundingClientRect();
+  const pop = document.createElement("div");
+  pop.id = "filterPopup";
+  pop.style.cssText = `position:fixed; top:${rect.bottom + 4}px; left:${rect.left}px; background:#fff; border:1px solid #d7dbe0; border-radius:8px; box-shadow:0 4px 16px rgba(0,0,0,.15); padding:10px; z-index:300; max-height:260px; overflow:auto; font-size:12px; min-width:150px;`;
+  pop.innerHTML = `<div style="font-weight:600; margin-bottom:6px;">${label} 필터</div>` +
+    `<label style="display:block; margin-bottom:4px;"><input type="checkbox" id="filterAllChk" ${!selected ? "checked" : ""}> 전체</label>` +
+    uniq.map(v => `<label style="display:block; margin-bottom:2px;"><input type="checkbox" class="fchk" value="${v}" ${(!selected || selected.has(v)) ? "checked" : ""}> ${v}</label>`).join("");
+  document.body.appendChild(pop);
+  pop.querySelector("#filterAllChk").onclick = (e) => {
+    e.stopPropagation();
+    if (e.target.checked) delete columnFilters[key];
+    else columnFilters[key] = new Set();
+    render();
+  };
+  pop.querySelectorAll(".fchk").forEach(chk => {
+    chk.onclick = (e) => {
+      e.stopPropagation();
+      let set = columnFilters[key] ? new Set(columnFilters[key]) : new Set(uniq);
+      if (chk.checked) set.add(chk.value); else set.delete(chk.value);
+      if (set.size === uniq.length) delete columnFilters[key]; else columnFilters[key] = set;
+      render();
+    };
+  });
+  pop.onclick = (e) => e.stopPropagation();
+}
+
+// ---------- resizers ----------
+function attachResizers(container) {
+  container.querySelectorAll(".resizer").forEach(rz => {
+    rz.addEventListener("mousedown", (e) => {
+      e.preventDefault(); e.stopPropagation();
+      const key = rz.dataset.key;
+      const startX = e.clientX;
+      const startW = colWidths[key] ?? Number(rz.dataset.defaultw);
+      function onMove(ev) {
+        const newW = Math.max(30, startW + (ev.clientX - startX));
+        colWidths[key] = newW;
+        container.querySelectorAll(`[data-colkey="${key}"]`).forEach(el => {
+          el.style.width = newW + "px"; el.style.minWidth = newW + "px"; el.style.maxWidth = newW + "px";
+        });
+        updateFrozenLefts(container);
+      }
+      function onUp() { document.removeEventListener("mousemove", onMove); document.removeEventListener("mouseup", onUp); }
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    });
+  });
+}
+function updateFrozenLefts(container) {
+  let left = 0;
+  FROZEN_COLS.forEach(c => {
+    const w = colWidths[c.key] ?? c.w;
+    container.querySelectorAll(`[data-colkey="${c.key}"]`).forEach(el => { el.style.left = left + "px"; });
+    left += w;
+  });
+}
+
+// ---------- render ----------
 function render() {
   if (!me) return;
   document.getElementById("subtitle").textContent = currentTab === "ALL" ? "전체 탭" : `${currentTab} 담당자 페이지`;
   document.getElementById("allTopBar").style.display = currentTab === "ALL" ? "flex" : "none";
   document.getElementById("newItemPanel").style.display = currentTab === "ALL" ? "none" : "block";
-  document.getElementById("startCycleWrap").style.display = currentTab === "ALL" ? "flex" : "none";
-  if (currentTab !== "ALL") renderNewItemRowsIfNeeded();
 
   const container = document.getElementById("tablecontainer");
   const search = document.getElementById("searchBox").value.trim().toLowerCase();
-  const packF = document.getElementById("packFilter").value;
+  const tokens = search.split(/\s+/).filter(Boolean);
 
   let rows = items.filter(it => currentTab === "ALL" ? true : it.staff === currentTab);
-  if (packF) rows = rows.filter(it => it.pack === packF);
-  if (search) {
+  rows = rows.filter(it => FILTERABLE_KEYS.every(k => !columnFilters[k] || columnFilters[k].has(String(it[k] ?? ""))));
+  if (tokens.length) {
     rows = rows.filter(it => {
-      const spec = `${it.garo}x${it.sero}`;
-      return (it.jong || "").toLowerCase().includes(search) ||
-        String(it.pyeong || "").includes(search) ||
-        spec.includes(search.replace(/\s/g, ""));
+      const hay = [it.gubun, it.customer, it.staff, it.jong, it.pyeong, it.garo, it.sero, it.pack, it.note, `${it.garo}x${it.sero}`]
+        .map(v => String(v ?? "").toLowerCase()).join(" ");
+      return tokens.every(t => hay.includes(t));
     });
   }
-  document.getElementById("rowCount").textContent = `전체 ${items.length}개 중 ${rows.length}개 표시`;
+  document.getElementById("rowCount").textContent = `전체 ${items.filter(it => currentTab === "ALL" ? true : it.staff === currentTab).length}개 중 ${rows.length}개 표시`;
 
-  if (currentTab === "ALL") {
-    renderAllTable(container, rows);
-  } else {
-    renderStaffTable(container, rows);
+  buildTable(container, rows, { editable: currentTab !== "ALL" });
+  attachResizers(container);
+  if (activeFilterKey) {
+    const anchor = container.querySelector(`[data-filterkey="${activeFilterKey}"]`);
+    if (anchor) openFilterPopup(activeFilterKey, anchor.dataset.filterlabel, anchor);
+  }
+
+  if (currentTab !== "ALL") {
+    const staffCloseBtn = document.getElementById("staffCloseBtn");
+    if (staffCloseBtn) staffCloseBtn.onclick = staffCloseCurrentCycle;
   }
 }
 
-function renderAllTable(container, rows) {
-  const frozenCols = withLefts(FROZEN_ALL);
+function buildTable(container, rows, opts) {
+  const editable = !!opts.editable;
+  const oc = currentOpenCycle();
+  const frozenCols = withLefts(FROZEN_COLS);
 
-  const frozenHead = frozenCols.map(c =>
-    `<th class="hcell frozen" rowspan="2" style="left:${c.left}px; width:${c.w}px; min-width:${c.w}px; max-width:${c.w}px;">${c.label}</th>`
-  ).join("");
-
-  const head1 = displayCycles.map(c => {
-    const bg = c.status === "open" ? "#fff7e6" : "#eef1f5";
-    const dcolor = c.status === "open" ? "#b45309" : "#8a8f98";
-    const tag = c.status === "open" ? "(의뢰)" : "(확정)";
-    return `<th class="grpcell" colspan="2" style="background:${bg};">${c.label} ${tag}<br><span style="font-size:9px; color:${dcolor};">마감${c.status==="open"?"예정":""} ${c.deadline||""}</span></th>`;
+  const frozenHead = frozenCols.map(c => {
+    const filterable = FILTERABLE_KEYS.includes(c.key);
+    const filterIcon = filterable ? `<span class="filterIcon" data-key="${c.key}">⏷</span>` : "";
+    return `<th class="hcell frozen relhdr" data-colkey="${c.key}" ${filterable ? `data-filterkey="${c.key}" data-filterlabel="${c.label}"` : ""} rowspan="2" style="left:${c.left}px; width:${c.w}px; min-width:${c.w}px; max-width:${c.w}px;">${c.label}${filterIcon}<div class="resizer" data-key="${c.key}" data-defaultw="${c.w}"></div></th>`;
   }).join("");
-  const head2 = displayCycles.map(c => {
-    const bg = c.status === "open" ? "background:#fff7e6;" : "";
-    return `<th class="hcell num" style="${bg}">수량</th><th class="hcell num" style="${bg}">중량</th>`;
+
+  const shadeColors = ["#eef1f5", "#e3e7ee"];
+  const head1 = displayCycles.map((c, idx) => {
+    const isOpen = c.status === "open";
+    const bg = isOpen ? "#fff7e6" : shadeColors[idx % 2];
+    const dcolor = isOpen ? "#b45309" : "#8a8f98";
+    const tag = isOpen ? "(의뢰)" : "(확정)";
+    const colspan = hideWeight ? 1 : 2;
+    return `<th class="grpcell" colspan="${colspan}" style="background:${bg}; border-left:2px solid #b9bfc7;">${c.label} ${tag}<br><span style="font-size:9px; color:${dcolor};">마감${isOpen ? "예정" : ""} ${c.deadline || ""}</span></th>`;
+  }).join("");
+
+  const head2 = displayCycles.map((c, idx) => {
+    const isOpen = c.status === "open";
+    const shade = isOpen ? "#fff7e6" : shadeColors[idx % 2];
+    const qtyKey = `qty_${c.id}`, wKey = `weight_${c.id}`;
+    const qtyW = colWidths[qtyKey] ?? 70, wW = colWidths[wKey] ?? 70;
+    let h = `<th class="hcell num relhdr" data-colkey="${qtyKey}" style="background:${shade}; width:${qtyW}px; min-width:${qtyW}px; max-width:${qtyW}px; border-left:2px solid #b9bfc7;">수량<div class="resizer" data-key="${qtyKey}" data-defaultw="70"></div></th>`;
+    if (!hideWeight) {
+      h += `<th class="hcell num relhdr" data-colkey="${wKey}" style="background:${shade}; width:${wW}px; min-width:${wW}px; max-width:${wW}px;">중량<div class="resizer" data-key="${wKey}" data-defaultw="70"></div></th>`;
+    }
+    return h;
   }).join("");
 
   const bodyRows = rows.map(it => {
     const frozenCells = frozenCols.map(c => {
       const val = it[c.key] ?? "";
       const colorStyle = c.key === "note" ? "color:#8a8f98;" : "";
-      return `<td class="cell frozen" style="left:${c.left}px; width:${c.w}px; min-width:${c.w}px; max-width:${c.w}px; ${colorStyle}">${val}</td>`;
+      return `<td class="cell frozen" data-colkey="${c.key}" style="left:${c.left}px; width:${c.w}px; min-width:${c.w}px; max-width:${c.w}px; ${colorStyle}">${val}</td>`;
     }).join("");
-    const cells = displayCycles.map(c => {
-      const e = entries[`${it.id}_${c.id}`] || {};
+    const cells = displayCycles.map((c, idx) => {
       const isOpen = c.status === "open";
-      const qty = isOpen ? (e.qtyTotal ?? "") : (e.confirmedQty ?? e.qtyTotal ?? "—");
-      const weight = isOpen ? (e.weightTotal ?? "") : (e.confirmedWeight ?? e.weightTotal ?? "—");
-      const mismatchBg = e.mismatch ? "background:#fdecea;" : (isOpen ? "background:#fffdf5;" : "");
-      return `<td class="cell num" style="${mismatchBg}">${fmt(qty)}</td><td class="cell num" style="color:#8a8f98; ${mismatchBg}">${fmt(weight)}</td>`;
+      const e = entries[`${it.id}_${c.id}`] || {};
+      const shade = isOpen ? "#fffdf5" : (shadeColors[idx % 2] === "#e3e7ee" ? "#fafbfc" : "#ffffff");
+      const mismatchBg = e.mismatch ? "background:#fdecea;" : `background:${shade};`;
+      const qtyKey = `qty_${c.id}`, wKey = `weight_${c.id}`;
+      const qtyW = colWidths[qtyKey] ?? 70, wW = colWidths[wKey] ?? 70;
+
+      let qtyCellInner;
+      if (editable && isOpen) {
+        qtyCellInner = `<input class="inp qty-input" data-item="${it.id}" type="number" style="padding:2px 5px; text-align:right; border:1px solid #d7dbe0;" value="${e.qtyTotal ?? ""}">`;
+      } else {
+        const qty = isOpen ? (e.qtyTotal ?? "") : (e.confirmedQty ?? e.qtyTotal ?? "—");
+        qtyCellInner = fmt(qty);
+      }
+      let cellsHtml = `<td class="cell num" data-colkey="${qtyKey}" style="width:${qtyW}px; min-width:${qtyW}px; max-width:${qtyW}px; border-left:2px solid #b9bfc7; ${mismatchBg}">${qtyCellInner}</td>`;
+      if (!hideWeight) {
+        const weight = isOpen ? (e.weightTotal ?? "") : (e.confirmedWeight ?? e.weightTotal ?? "—");
+        cellsHtml += `<td class="cell num" data-colkey="${wKey}" style="width:${wW}px; min-width:${wW}px; max-width:${wW}px; color:#8a8f98; ${mismatchBg}">${fmt(weight)}</td>`;
+      }
+      return cellsHtml;
     }).join("");
     return `<tr>${frozenCells}${cells}</tr>`;
   }).join("");
 
+  const staffBar = editable ? `
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <span class="badge" style="background:#fdf2e9; color:#b45309;">이번 차수 ${oc ? `${oc.label} · 마감예정 ${oc.deadline||"-"}` : "진행 중인 차수 없음"}</span>
+      <button id="staffCloseBtn" class="btn btn-accent">🔒 마감완료 처리</button>
+    </div>` : "";
+
   container.innerHTML = `
+    ${staffBar}
     <table>
       <thead>
         <tr>${frozenHead}${head1}</tr>
@@ -552,65 +616,26 @@ function renderAllTable(container, rows) {
       </thead>
       <tbody>${bodyRows}</tbody>
     </table>`;
-}
 
-function renderStaffTable(container, rows) {
-  const oc = currentOpenCycle();
-  const frozenCols = withLefts(FROZEN_STAFF);
-  const frozenHead = frozenCols.map(c =>
-    `<th class="hcell frozen" style="left:${c.left}px; width:${c.w}px; min-width:${c.w}px; max-width:${c.w}px;">${c.label}</th>`
-  ).join("");
-
-  const bodyRows = rows.map(it => {
-    const id = oc ? `${it.id}_${oc.id}` : null;
-    const e = id ? (entries[id] || {}) : {};
-    const frozenCells = frozenCols.map(c => {
-      const val = it[c.key] ?? "";
-      const colorStyle = c.key === "note" ? "color:#8a8f98;" : "";
-      return `<td class="cell frozen" style="left:${c.left}px; width:${c.w}px; min-width:${c.w}px; max-width:${c.w}px; ${colorStyle}">${val}</td>`;
-    }).join("");
-    return `<tr>
-      ${frozenCells}
-      <td class="cell num">${it.demand??""}</td>
-      <td class="cell num" style="background:#fffdf5; padding:3px 6px;">
-        <input class="inp qty-input" data-item="${it.id}" type="number" style="padding:3px 6px; text-align:right;" value="${e.qtyTotal ?? ""}">
-      </td>
-      <td class="cell num" style="background:#fffdf5; color:#8a8f98;">${fmt(e.weightTotal)}</td>
-    </tr>`;
-  }).join("");
-
-  const oc_label = oc ? `${oc.label} · 마감예정 ${oc.deadline||"-"}` : "진행 중인 차수 없음";
-  container.innerHTML = `
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
-      <span class="badge" style="background:#fdf2e9; color:#b45309;">이번 차수 ${oc_label}</span>
-      <button id="staffCloseBtn" class="btn btn-accent">🔒 마감완료 처리</button>
-    </div>
-    <table>
-      <thead>
-        <tr>
-          ${frozenHead}
-          <th class="hcell num">수요</th>
-          <th class="hcell num" style="background:#fff7e6;">${oc?oc.label:''} 수량 입력</th>
-          <th class="hcell num" style="background:#fff7e6;">중량(자동)</th>
-        </tr>
-      </thead>
-      <tbody>${bodyRows}</tbody>
-    </table>`;
-
-  document.getElementById("staffCloseBtn").onclick = staffCloseCurrentCycle;
-  container.querySelectorAll(".qty-input").forEach(inp => {
-    inp.addEventListener("change", async () => {
-      const itemId = inp.dataset.item;
-      const item = items.find(i => i.id === itemId);
-      if (!oc || !item) return;
-      await writeEntryQty(itemId, oc.id, inp.value, item);
-    });
+  container.querySelectorAll(".filterIcon").forEach(icon => {
+    icon.onclick = (e) => {
+      e.stopPropagation();
+      const key = icon.dataset.key;
+      const th = icon.closest("th");
+      openFilterPopup(key, th.dataset.filterlabel, th);
+    };
   });
-}
 
-let newItemRowsRendered = false;
-function renderNewItemRowsIfNeeded() {
-  if (!newItemRowsRendered) { renderNewItemRows(); newItemRowsRendered = true; }
+  if (editable) {
+    container.querySelectorAll(".qty-input").forEach(inp => {
+      inp.addEventListener("change", async () => {
+        const itemId = inp.dataset.item;
+        const item = items.find(i => i.id === itemId);
+        if (!oc || !item) return;
+        await writeEntryQty(itemId, oc.id, inp.value, item);
+      });
+    });
+  }
 }
 
 function fmt(v) {
@@ -618,14 +643,14 @@ function fmt(v) {
   if (v === "—") return "—";
   const n = Number(v);
   if (Number.isNaN(n)) return v;
+  if (n === 0) return "";
   return Math.round(n).toLocaleString();
 }
 
 document.getElementById("searchBox").oninput = render;
-document.getElementById("packFilter").onchange = render;
+document.getElementById("hideWeightChk").onchange = (e) => { hideWeight = e.target.checked; render(); };
 document.getElementById("startCycleApply").onclick = () => {
-  const v = document.getElementById("startCycleInput").value.trim();
-  startCycleOverride = v || null;
+  startCycleOverride = document.getElementById("startCycleInput").value.trim() || null;
   computeDisplayCycles();
   render();
 };
