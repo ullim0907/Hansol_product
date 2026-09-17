@@ -13,9 +13,12 @@
   button { font-family: inherit; cursor: pointer; }
   input, select { font-family: inherit; }
   table { border-collapse: collapse; }
-  .cell { border: 1px solid #d7dbe0; padding: 5px 8px; font-size: 12px; white-space: nowrap; }
-  .hcell { border: 1px solid #c3c8d0; padding: 5px 8px; font-size: 11px; font-weight: 700; color: #3a3f47; background: #eef1f5; white-space: nowrap; cursor: pointer; user-select: none; }
-  .grpcell { border: 1px solid #c3c8d0; padding: 4px 8px; font-size: 11px; font-weight: 700; text-align: center; white-space: nowrap; }
+  .cell { border: 1px solid #d7dbe0; padding: 4.75px 7.6px; font-size: 11px; font-weight: 400; white-space: nowrap; background: #fff; overflow: hidden; text-overflow: ellipsis; }
+  .hcell { border: 1px solid #c3c8d0; padding: 5px 8px; font-size: 11px; font-weight: 400; color: #3a3f47; background: #eef1f5; white-space: nowrap; cursor: pointer; user-select: none; }
+  .grpcell { border: 1px solid #c3c8d0; padding: 4px 8px; font-size: 11px; font-weight: 400; text-align: center; white-space: nowrap; }
+  .num { text-align: right; }
+  .frozen { position: sticky; z-index: 2; }
+  thead .frozen { z-index: 4; }
   .inp { border: 1px solid #d7dbe0; border-radius: 5px; padding: 5px 8px; font-size: 12px; font-family: inherit; width: 100%; background: #fff; }
   .btn { border: none; border-radius: 7px; padding: 7px 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
   .btn-accent { background: #1f6feb; color: #fff; }
@@ -85,6 +88,12 @@
       <option value="Skid">Skid</option>
       <option value="Ream">Ream</option>
     </select>
+    <span id="startCycleWrap" style="display:none; align-items:center; gap:8px;">
+      <span style="font-size:11px; color:#8a8f98;">시작 차수</span>
+      <input id="startCycleInput" class="inp" style="width:120px;" placeholder="예: 26-8-3">
+      <button id="startCycleApply" class="btn btn-outline">검색</button>
+      <button id="startCycleReset" class="btn btn-outline">초기화(최근 5개)</button>
+    </span>
     <div style="flex:1;"></div>
     <div id="rowCount" style="font-size:11px; color:#8a8f98;"></div>
   </div>
@@ -136,7 +145,35 @@ let entries = {};        // key `${itemId}_${cycleId}` -> {qtyTotal,weightTotal,
 let staffCycleStatus = {}; // key `${cycleId}_${staffId}` -> {status}
 let currentTab = "ALL";  // "ALL" or staff name
 let me = null;           // {id,name}
-let displayCycles = [];  // computed: last4 confirmed + open
+let displayCycles = [];  // computed: last5 confirmed (or from startCycleOverride) + open
+let startCycleOverride = null; // e.g. "26-8-3" -> show from this confirmed cycle onward
+
+// frozen (틀고정) column definitions
+const FROZEN_ALL = [
+  { key: "gubun", label: "구분", w: 60 },
+  { key: "customer", label: "고객사", w: 110 },
+  { key: "staff", label: "담당자", w: 65 },
+  { key: "jong", label: "지종", w: 75 },
+  { key: "pyeong", label: "평량", w: 55 },
+  { key: "garo", label: "가로", w: 55 },
+  { key: "sero", label: "세로", w: 55 },
+  { key: "pack", label: "포장", w: 65 },
+  { key: "note", label: "비고", w: 110 },
+];
+const FROZEN_STAFF = [
+  { key: "gubun", label: "구분", w: 60 },
+  { key: "customer", label: "고객사", w: 110 },
+  { key: "jong", label: "지종", w: 75 },
+  { key: "pyeong", label: "평량", w: 55 },
+  { key: "garo", label: "가로", w: 55 },
+  { key: "sero", label: "세로", w: 55 },
+  { key: "pack", label: "포장", w: 65 },
+  { key: "note", label: "비고", w: 110 },
+];
+function withLefts(cols) {
+  let left = 0;
+  return cols.map(c => { const withLeft = { ...c, left }; left += c.w; return withLeft; });
+}
 
 function cycleSortKey(label) {
   // "26-10-3" -> [26,10,3]
@@ -212,8 +249,15 @@ function subscribeAll() {
 function computeDisplayCycles() {
   const confirmed = cycles.filter(c => c.status === "confirmed").sort(cmpCycle);
   const open = cycles.filter(c => c.status === "open").sort(cmpCycle);
-  const last4 = confirmed.slice(-4);
-  displayCycles = [...last4, ...open.slice(-1)];
+  let selected;
+  if (startCycleOverride) {
+    const startKey = cycleSortKey(startCycleOverride);
+    selected = confirmed.filter(c => cmpCycle({ label: c.label }, { label: startCycleOverride }) >= 0);
+    if (selected.length === 0) selected = confirmed.slice(-5);
+  } else {
+    selected = confirmed.slice(-5);
+  }
+  displayCycles = [...selected, ...open.slice(-1)];
 }
 
 function currentOpenCycle() {
@@ -317,7 +361,7 @@ async function staffCloseCurrentCycle() {
 // ---------- weight calc ----------
 function calcWeight(item, qty) {
   const g = Number(item.garo) || 0, i = Number(item.sero) || 0, p = Number(item.pyeong) || 0, q = Number(qty) || 0;
-  return Math.round((p * g * i * 500 / 1000000000 * q) * 100) / 100;
+  return Math.round(p * g * i * 500 / 1000000000 * q);
 }
 
 // ---------- entries write (qty input) ----------
@@ -439,6 +483,7 @@ function render() {
   document.getElementById("subtitle").textContent = currentTab === "ALL" ? "전체 탭" : `${currentTab} 담당자 페이지`;
   document.getElementById("allTopBar").style.display = currentTab === "ALL" ? "flex" : "none";
   document.getElementById("newItemPanel").style.display = currentTab === "ALL" ? "none" : "block";
+  document.getElementById("startCycleWrap").style.display = currentTab === "ALL" ? "flex" : "none";
   if (currentTab !== "ALL") renderNewItemRowsIfNeeded();
 
   const container = document.getElementById("tablecontainer");
@@ -465,55 +510,44 @@ function render() {
 }
 
 function renderAllTable(container, rows) {
+  const frozenCols = withLefts(FROZEN_ALL);
+
+  const frozenHead = frozenCols.map(c =>
+    `<th class="hcell frozen" rowspan="2" style="left:${c.left}px; width:${c.w}px; min-width:${c.w}px; max-width:${c.w}px;">${c.label}</th>`
+  ).join("");
+
   const head1 = displayCycles.map(c => {
     const bg = c.status === "open" ? "#fff7e6" : "#eef1f5";
     const dcolor = c.status === "open" ? "#b45309" : "#8a8f98";
-    const tag = c.status === "open" ? "(의뢐)" : "(확정)";
-    return `<th class="grpcell" colspan="2" style="background:${bg};">${c.label} ${tag}<br><span style="font-weight:400; font-size:9px; color:${dcolor};">마감${c.status==="open"?"예정":""} ${c.deadline||""}</span></th>`;
+    const tag = c.status === "open" ? "(의뢰)" : "(확정)";
+    return `<th class="grpcell" colspan="2" style="background:${bg};">${c.label} ${tag}<br><span style="font-size:9px; color:${dcolor};">마감${c.status==="open"?"예정":""} ${c.deadline||""}</span></th>`;
   }).join("");
   const head2 = displayCycles.map(c => {
     const bg = c.status === "open" ? "background:#fff7e6;" : "";
-    return `<th class="hcell" style="${bg}">수량</th><th class="hcell" style="${bg}">중량</th>`;
+    return `<th class="hcell num" style="${bg}">수량</th><th class="hcell num" style="${bg}">중량</th>`;
   }).join("");
 
   const bodyRows = rows.map(it => {
+    const frozenCells = frozenCols.map(c => {
+      const val = it[c.key] ?? "";
+      const colorStyle = c.key === "note" ? "color:#8a8f98;" : "";
+      return `<td class="cell frozen" style="left:${c.left}px; width:${c.w}px; min-width:${c.w}px; max-width:${c.w}px; ${colorStyle}">${val}</td>`;
+    }).join("");
     const cells = displayCycles.map(c => {
       const e = entries[`${it.id}_${c.id}`] || {};
       const isOpen = c.status === "open";
       const qty = isOpen ? (e.qtyTotal ?? "") : (e.confirmedQty ?? e.qtyTotal ?? "—");
       const weight = isOpen ? (e.weightTotal ?? "") : (e.confirmedWeight ?? e.weightTotal ?? "—");
-      const mismatchBg = e.mismatch ? "background:#fdecea; font-weight:700;" : (isOpen ? "background:#fffdf5; font-weight:700;" : "");
-      return `<td class="cell" style="${mismatchBg}">${fmt(qty)}</td><td class="cell" style="color:#8a8f98;">${fmt(weight)}</td>`;
+      const mismatchBg = e.mismatch ? "background:#fdecea;" : (isOpen ? "background:#fffdf5;" : "");
+      return `<td class="cell num" style="${mismatchBg}">${fmt(qty)}</td><td class="cell num" style="color:#8a8f98; ${mismatchBg}">${fmt(weight)}</td>`;
     }).join("");
-    return `<tr>
-      <td class="cell">${it.gubun||""}</td>
-      <td class="cell">${it.customer||""}</td>
-      <td class="cell" style="font-weight:600;">${it.staff||""}</td>
-      <td class="cell" style="font-weight:600;">${it.jong||""}</td>
-      <td class="cell">${it.pyeong??""}</td>
-      <td class="cell">${it.garo??""}</td>
-      <td class="cell">${it.sero??""}</td>
-      <td class="cell">${it.pack||""}</td>
-      <td class="cell" style="color:#8a8f98;">${it.note||""}</td>
-      ${cells}
-    </tr>`;
+    return `<tr>${frozenCells}${cells}</tr>`;
   }).join("");
 
   container.innerHTML = `
     <table>
       <thead>
-        <tr>
-          <th class="hcell" rowspan="2">구분</th>
-          <th class="hcell" rowspan="2">고객사</th>
-          <th class="hcell" rowspan="2">담당자</th>
-          <th class="hcell" rowspan="2">지종</th>
-          <th class="hcell" rowspan="2">평량</th>
-          <th class="hcell" rowspan="2">가로</th>
-          <th class="hcell" rowspan="2">세로</th>
-          <th class="hcell" rowspan="2">포장</th>
-          <th class="hcell" rowspan="2">비고</th>
-          ${head1}
-        </tr>
+        <tr>${frozenHead}${head1}</tr>
         <tr>${head2}</tr>
       </thead>
       <tbody>${bodyRows}</tbody>
@@ -522,23 +556,26 @@ function renderAllTable(container, rows) {
 
 function renderStaffTable(container, rows) {
   const oc = currentOpenCycle();
+  const frozenCols = withLefts(FROZEN_STAFF);
+  const frozenHead = frozenCols.map(c =>
+    `<th class="hcell frozen" style="left:${c.left}px; width:${c.w}px; min-width:${c.w}px; max-width:${c.w}px;">${c.label}</th>`
+  ).join("");
+
   const bodyRows = rows.map(it => {
     const id = oc ? `${it.id}_${oc.id}` : null;
     const e = id ? (entries[id] || {}) : {};
+    const frozenCells = frozenCols.map(c => {
+      const val = it[c.key] ?? "";
+      const colorStyle = c.key === "note" ? "color:#8a8f98;" : "";
+      return `<td class="cell frozen" style="left:${c.left}px; width:${c.w}px; min-width:${c.w}px; max-width:${c.w}px; ${colorStyle}">${val}</td>`;
+    }).join("");
     return `<tr>
-      <td class="cell">${it.gubun||""}</td>
-      <td class="cell">${it.customer||""}</td>
-      <td class="cell" style="font-weight:600;">${it.jong||""}</td>
-      <td class="cell">${it.pyeong??""}</td>
-      <td class="cell">${it.garo??""}</td>
-      <td class="cell">${it.sero??""}</td>
-      <td class="cell">${it.pack||""}</td>
-      <td class="cell" style="color:#8a8f98;">${it.note||""}</td>
-      <td class="cell">${it.demand??""}</td>
-      <td class="cell" style="background:#fffdf5; padding:3px 6px;">
+      ${frozenCells}
+      <td class="cell num">${it.demand??""}</td>
+      <td class="cell num" style="background:#fffdf5; padding:3px 6px;">
         <input class="inp qty-input" data-item="${it.id}" type="number" style="padding:3px 6px; text-align:right;" value="${e.qtyTotal ?? ""}">
       </td>
-      <td class="cell" style="background:#fffdf5; color:#8a8f98; text-align:right;">${fmt(e.weightTotal)}</td>
+      <td class="cell num" style="background:#fffdf5; color:#8a8f98;">${fmt(e.weightTotal)}</td>
     </tr>`;
   }).join("");
 
@@ -551,11 +588,10 @@ function renderStaffTable(container, rows) {
     <table>
       <thead>
         <tr>
-          <th class="hcell">구분</th><th class="hcell">고객사</th><th class="hcell">지종</th>
-          <th class="hcell">평량</th><th class="hcell">가로</th><th class="hcell">세로</th>
-          <th class="hcell">포장</th><th class="hcell">비고</th><th class="hcell">수요</th>
-          <th class="hcell" style="background:#fff7e6;">${oc?oc.label:''} 수량 입력</th>
-          <th class="hcell" style="background:#fff7e6;">중량(자동)</th>
+          ${frozenHead}
+          <th class="hcell num">수요</th>
+          <th class="hcell num" style="background:#fff7e6;">${oc?oc.label:''} 수량 입력</th>
+          <th class="hcell num" style="background:#fff7e6;">중량(자동)</th>
         </tr>
       </thead>
       <tbody>${bodyRows}</tbody>
@@ -582,11 +618,23 @@ function fmt(v) {
   if (v === "—") return "—";
   const n = Number(v);
   if (Number.isNaN(n)) return v;
-  return n.toLocaleString();
+  return Math.round(n).toLocaleString();
 }
 
 document.getElementById("searchBox").oninput = render;
 document.getElementById("packFilter").onchange = render;
+document.getElementById("startCycleApply").onclick = () => {
+  const v = document.getElementById("startCycleInput").value.trim();
+  startCycleOverride = v || null;
+  computeDisplayCycles();
+  render();
+};
+document.getElementById("startCycleReset").onclick = () => {
+  startCycleOverride = null;
+  document.getElementById("startCycleInput").value = "";
+  computeDisplayCycles();
+  render();
+};
 
 // ---------- boot ----------
 async function startApp() {
